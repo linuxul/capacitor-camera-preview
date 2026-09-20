@@ -13,16 +13,16 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "CameraPreviewPlugin"
     public let jsName = "CameraPreview"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "capture", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "captureSample", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "flip", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getSupportedFlashModes", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setFlashMode", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "startRecordVideo", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stopRecordVideo", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "isCameraStarted", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "start", returnType: .promise),
+        CAPPluginMethod(name: "stop", returnType: .promise),
+        CAPPluginMethod(name: "capture", returnType: .promise),
+        CAPPluginMethod(name: "captureSample", returnType: .promise),
+        CAPPluginMethod(name: "flip", returnType: .promise),
+        CAPPluginMethod(name: "getSupportedFlashModes", returnType: .promise),
+        CAPPluginMethod(name: "setFlashMode", returnType: .promise),
+        CAPPluginMethod(name: "startRecordVideo", returnType: .promise),
+        CAPPluginMethod(name: "stopRecordVideo", returnType: .promise),
+        CAPPluginMethod(name: "isCameraStarted", returnType: .promise)
     ]
 
     var previewView: UIView!

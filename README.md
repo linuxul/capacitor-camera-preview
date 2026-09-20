@@ -10,6 +10,8 @@
 <br>
 Version 8 of this plugin requires Capacitor 8.
 
+This fork requires the forked Kotlin/Swift Capacitor runtime, iOS 17 and Android 13 (API 33).
+
 If you are using Capacitor 7, use [version 7.0.5](https://github.com/capacitor-community/camera-preview/releases/tag/v7.0.5)
 
 If you are using Capacitor 6, use [version 6.0.1](https://github.com/capacitor-community/camera-preview/releases/tag/v6.0.1)
