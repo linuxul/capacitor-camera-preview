@@ -14,6 +14,7 @@ import com.getcapacitor.Logger
 import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
+import com.getcapacitor.PluginException
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
@@ -53,32 +54,31 @@ public class CameraPreview :
         try {
             // Without a preview this throws, which is reported like any other failure to flip.
             fragment!!.switchCamera()
-            call.resolve()
         } catch (e: Exception) {
             Logger.debug(logTag, "Camera flip exception: $e")
-            call.reject("failed to flip camera")
+            throw PluginException("failed to flip camera")
         }
+        call.resolve()
     }
 
     @PluginMethod
     public fun setOpacity(call: PluginCall) {
         val fragment = fragment
         if (fragment?.camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
 
-        bridge.saveCall(call)
         val opacity = call.getFloat("opacity") ?: 1f
         fragment.setOpacity(opacity)
+        // Nothing answers this call later: it used to be saved and left pending
+        call.resolve()
     }
 
     @PluginMethod
     public fun capture(call: PluginCall) {
         val fragment = fragment
         if (fragment?.camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
         bridge.saveCall(call)
         captureCallbackId = call.callbackId
@@ -94,8 +94,7 @@ public class CameraPreview :
     public fun captureSample(call: PluginCall) {
         val fragment = fragment
         if (fragment?.camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
         bridge.saveCall(call)
         snapshotCallbackId = call.callbackId
@@ -104,6 +103,8 @@ public class CameraPreview :
         fragment.takeSnapshot(quality)
     }
 
+    // stop does all of its work on the main thread but stays on the plugin thread: start hands its view work to the
+    // main thread from the plugin thread, and a MAIN stop could run before the work of an earlier start.
     @SuppressLint("WrongConstant")
     @PluginMethod
     public fun stop(call: PluginCall) {
@@ -133,8 +134,7 @@ public class CameraPreview :
     public fun getSupportedFlashModes(call: PluginCall) {
         val camera = fragment?.camera
         if (camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
 
         val supportedFlashModes: List<String>? = camera.parameters.supportedFlashModes
@@ -151,26 +151,22 @@ public class CameraPreview :
         val fragment = fragment
         val camera = fragment?.camera
         if (fragment == null || camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
 
         val flashMode = call.getString("flashMode")
         if (flashMode.isNullOrEmpty()) {
-            call.reject("flashMode required parameter is missing")
-            return
+            throw PluginException("flashMode required parameter is missing")
         }
 
         val params = camera.parameters
 
         // A camera without a flash reports no list at all, and this throws as it always did.
         val supportedFlashModes = camera.parameters.supportedFlashModes!!
-        if (supportedFlashModes.indexOf(flashMode) > -1) {
-            params.flashMode = flashMode
-        } else {
-            call.reject("Flash mode not recognised: $flashMode")
-            return
+        if (supportedFlashModes.indexOf(flashMode) == -1) {
+            throw PluginException("Flash mode not recognised: $flashMode")
         }
+        params.flashMode = flashMode
 
         fragment.setCameraParameters(params)
 
@@ -181,8 +177,7 @@ public class CameraPreview :
     public fun startRecordVideo(call: PluginCall) {
         val fragment = fragment
         if (fragment?.camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
         val filename = "videoTmp"
         videoFilePath = activity.cacheDir.toString() + "/"
@@ -206,8 +201,7 @@ public class CameraPreview :
     public fun stopRecordVideo(call: PluginCall) {
         val fragment = fragment
         if (fragment?.camera == null) {
-            call.reject("Camera is not running")
-            return
+            throw PluginException("Camera is not running")
         }
 
         println("stopRecordVideo - Callbackid=" + call.callbackId)
