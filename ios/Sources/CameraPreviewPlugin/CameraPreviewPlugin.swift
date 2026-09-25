@@ -13,16 +13,16 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "CameraPreviewPlugin"
     public let jsName = "CameraPreview"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "start", returnType: .promise),
-        CAPPluginMethod(name: "stop", returnType: .promise),
-        CAPPluginMethod(name: "capture", returnType: .promise),
-        CAPPluginMethod(name: "captureSample", returnType: .promise),
-        CAPPluginMethod(name: "flip", returnType: .promise),
-        CAPPluginMethod(name: "getSupportedFlashModes", returnType: .promise),
-        CAPPluginMethod(name: "setFlashMode", returnType: .promise),
-        CAPPluginMethod(name: "startRecordVideo", returnType: .promise),
-        CAPPluginMethod(name: "stopRecordVideo", returnType: .promise),
-        CAPPluginMethod(name: "isCameraStarted", returnType: .promise)
+        .promise("start", CameraPreview.start),
+        .promise("stop", CameraPreview.stop),
+        .promise("capture", CameraPreview.capture),
+        .promise("captureSample", CameraPreview.captureSample),
+        .promise("flip", CameraPreview.flip),
+        .promise("getSupportedFlashModes", CameraPreview.getSupportedFlashModes),
+        .promise("setFlashMode", CameraPreview.setFlashMode),
+        .promise("startRecordVideo", CameraPreview.startRecordVideo),
+        .promise("stopRecordVideo", CameraPreview.stopRecordVideo),
+        .async("isCameraStarted", CameraPreview.isCameraStarted)
     ]
 
     var previewView: UIView!
@@ -74,7 +74,12 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         cameraController.updateVideoOrientation()
     }
 
-    @objc func start(_ call: CAPPluginCall) {
+    // start, stop, capture, captureSample and the video methods stay synchronous. start and stop start and stop the
+    // capture session, and the bridge queue runs them in the order of the calls; they hand the session work to the
+    // main queue in that order. The capture methods answer from CameraController's completion handlers, which run on
+    // AVFoundation's delegate queues, where the image is encoded and written.
+
+    func start(_ call: CAPPluginCall) {
         self.cameraPosition = call.getString("position") ?? "rear"
         self.highResolutionOutput = call.getBool("enableHighResolution") ?? false
         self.cameraController.highResolutionOutput = self.highResolutionOutput
@@ -148,16 +153,16 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func flip(_ call: CAPPluginCall) {
+    func flip(_ call: CAPPluginCall) throws {
         do {
             try self.cameraController.switchCameras()
-            call.resolve()
         } catch {
-            call.reject("failed to flip camera")
+            throw CAPPluginError("failed to flip camera")
         }
+        call.resolve()
     }
 
-    @objc func stop(_ call: CAPPluginCall) {
+    func stop(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             if self.cameraController.captureSession?.isRunning ?? false {
                 self.cameraController.captureSession?.stopRunning()
@@ -189,7 +194,7 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         return path.appendingPathComponent(fileName)
     }
 
-    @objc func capture(_ call: CAPPluginCall) {
+    func capture(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
 
             let quality: Int? = call.getInt("quality", 85)
@@ -230,7 +235,7 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func captureSample(_ call: CAPPluginCall) {
+    func captureSample(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             let quality = call.getInt("quality", 85)
 
@@ -267,19 +272,19 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func getSupportedFlashModes(_ call: CAPPluginCall) {
+    func getSupportedFlashModes(_ call: CAPPluginCall) throws {
+        let supportedFlashModes: [String]
         do {
-            let supportedFlashModes = try self.cameraController.getSupportedFlashModes()
-            call.resolve(["result": supportedFlashModes])
+            supportedFlashModes = try self.cameraController.getSupportedFlashModes()
         } catch {
-            call.reject("failed to get supported flash modes")
+            throw CAPPluginError("failed to get supported flash modes")
         }
+        call.resolve(["result": supportedFlashModes])
     }
 
-    @objc func setFlashMode(_ call: CAPPluginCall) {
+    func setFlashMode(_ call: CAPPluginCall) throws {
         guard let flashMode = call.getString("flashMode") else {
-            call.reject("flashMode parameter is required")
-            return
+            throw CAPPluginError("flashMode parameter is required")
         }
         do {
             var flashModeAsEnum: AVCaptureDevice.FlashMode?
@@ -307,7 +312,7 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func startRecordVideo(_ call: CAPPluginCall) {
+    func startRecordVideo(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
 
             let quality: Int? = call.getInt("quality", 85)
@@ -331,20 +336,17 @@ public class CameraPreview: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func stopRecordVideo(_ call: CAPPluginCall) {
+    func stopRecordVideo(_ call: CAPPluginCall) {
 
         self.cameraController.stopRecording { (_) in
 
         }
     }
 
-    @objc func isCameraStarted(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            if self.cameraController.captureSession?.isRunning ?? false {
-                call.resolve(["value": true])
-            } else {
-                call.resolve(["value": false])
-            }
-        }
+    /// Whether the capture session runs. start and stop change the session on the main queue: the method reads it on
+    /// the main actor.
+    @MainActor
+    func isCameraStarted(_ call: CAPPluginCall) async -> JSObject {
+        return ["value": self.cameraController.captureSession?.isRunning ?? false]
     }
 }

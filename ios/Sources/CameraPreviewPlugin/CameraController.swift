@@ -269,8 +269,8 @@ extension CameraController {
         settings.flashMode = self.flashMode
         settings.isHighResolutionPhotoEnabled = self.highResolutionOutput
 
-        self.photoOutput?.capturePhoto(with: settings, delegate: self)
         self.photoCaptureCompletionBlock = completion
+        self.photoOutput?.capturePhoto(with: settings, delegate: self)
     }
 
     func captureSample(completion: @escaping (UIImage?, Error?) -> Void) {
@@ -489,15 +489,19 @@ extension CameraController: UIGestureRecognizerDelegate {
 
 extension CameraController: AVCapturePhotoCaptureDelegate {
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        // A completion answers one capture call: call it once
+        guard let completion = self.photoCaptureCompletionBlock else { return }
+        self.photoCaptureCompletionBlock = nil
+
         if let error = error {
-            self.photoCaptureCompletionBlock?(nil, error)
+            completion(nil, error)
             return
         }
 
         if let data = photo.fileDataRepresentation(), let image = UIImage(data: data) {
-            self.photoCaptureCompletionBlock?(image.fixedOrientation(), nil)
+            completion(image.fixedOrientation(), nil)
         } else {
-            self.photoCaptureCompletionBlock?(nil, CameraControllerError.unknown)
+            completion(nil, CameraControllerError.unknown)
         }
     }
 }
@@ -505,6 +509,8 @@ extension CameraController: AVCapturePhotoCaptureDelegate {
 extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let completion = sampleBufferCaptureCompletionBlock else { return }
+        // A completion answers one captureSample call: a frame that fails must not leave it for the next frame
+        sampleBufferCaptureCompletionBlock = nil
 
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             completion(nil, CameraControllerError.unknown)
@@ -539,8 +545,6 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
 
         let image = UIImage(cgImage: cgImage)
         completion(image.fixedOrientation(), nil)
-
-        sampleBufferCaptureCompletionBlock = nil
     }
 }
 
